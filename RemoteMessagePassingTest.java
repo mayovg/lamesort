@@ -16,7 +16,7 @@ public class RemoteMessagePassingTest {
     
     public static void startServer() {
 	try{
-	    ServerSocket servidor = new ServerSocket(8080);
+	    ServerSocket servidor = new ServerSocket(3000);
 	    System.out.println("servidor escuchando");
 	    Socket socket;
 	    RemoteMessagePassing<Message> pasoMensajes;
@@ -38,10 +38,11 @@ public class RemoteMessagePassingTest {
     
     public static void startClient() {
         try{
-	    Socket socket = new Socket("localhost", 3000);
-	    System.out.println("socket conectado con éxito");
+	    Socket socket;
 	    RemoteMessagePassing <Message> pasoMensajes;
 	    while (true){
+		socket = new Socket("localhost", 3000);
+		System.out.println("socket conectado con éxito");
 		pasoMensajes = new RemoteMessagePassing(socket);
 		Message msj = (Message)pasoMensajes.receive();
 		System.out.println(msj.toString());

@@ -23,6 +23,7 @@ public class Quicksort implements Runnable {
     private static Thread QuicksortThread(int izq, int der){
 	Quicksort qs = new Quicksort(izq,der);
 	Thread qst = new Thread(qs);
+	qst.start();
 	return qst;
     }
 

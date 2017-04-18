@@ -21,8 +21,8 @@ public class RemoteMessagePassing<T extends Serializable> {
 		entrada = new ObjectInputStream(socket.getInputStream());
 	    } catch (IOException ioe){ioe.printStackTrace();}
 	}
-	enviando = null;
-	recibiendo = null;
+	enviando = new Object();
+	recibiendo = new Object();
     }
     
     public void send(T obj) {

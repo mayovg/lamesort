@@ -7,6 +7,7 @@ public class ExtendedRendezvousTest {
         boolean isServer = "server".equals(args[0]);
         if (isServer) {
             startServer();
+	    startClient();
         } else {
             startClient();
         }
@@ -15,16 +16,19 @@ public class ExtendedRendezvousTest {
     public static void startServer() {
         try{
 	    ServerSocket servidor = new ServerSocket(3000);
+	    System.out.println("Servidor escuchando");
 	    Socket socket;
 	    ExtendedRendezvous<Message> extrend;
 	    Message msj;
 	    int msjId = 0; //id del mensaje
 	    while (true){
 	        socket = servidor.accept();
+		System.out.println("socket conectado");
 		extrend = new ExtendedRendezvous<Message>(socket);
-		msj = extrend.getRequest();
+		System.out.println("Rendezvous inicializado");
+		msj = (Message) extrend.requestAndAwaitReply(new Message(msjId++,"servido "+msjId));
 		System.out.println(msj.toString());
-		extrend.response(new Message(msjId++, "servido"));
+		//extrend.response(new Message(msjId++, "servido"));
 	    }
  	} catch (Exception ex) {ex.printStackTrace();}
 	
