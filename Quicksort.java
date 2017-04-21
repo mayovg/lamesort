@@ -1,3 +1,9 @@
+/**
+ * Computación Concurrente.
+ * Implementación de Quicksort en paralelo usando paso de mensajes.
+ * La implementación de paso de mensajes usada es ExtendedRendezvous.
+ */
+
 import java.io.Serializable;
 import java.net.Socket;
 import java.net.ServerSocket;
@@ -8,26 +14,37 @@ public class Quicksort implements Serializable {
     private int [] elem; // Arreglo de elementos a ordernar
     private int izq, i, der, d; //indices
     private int rango;
-    private int num_elem; // Número de elementos a ordenar
     
+    /**
+     * Constructor de Quicksort a partir de un arreglo de enteros
+     * @param us_elem - arreglo sin ordenar de enteros
+     */
     public Quicksort(int [] us_elem){
 	this.elem = us_elem.clone();
 	izq = der = -1;
     }
 
+    /**
+     * Constructor de Quicksort a partir de dos enteros (indices)
+     * @param izq, der - indices sobre los que se inicia el algoritmo
+     */
     private Quicksort(int izq, int der){
 	this.izq = izq;
 	this.der = der;
     }
 
-    protected class QuicksortServer implements Runnable{
+    /**
+     * Clase que funciona como servidor para el paso de mensajes de Quicksort
+     * La mayor parte del trabajo se hace aquí.
+     */
+    protected static class QuicksortServer implements Runnable{
 	Quicksort qs;
 	ServerSocket server;
 	Socket socket;
 	ExtendedRendezvous<Quicksort> er;
 
-	public QuicksortServer(Quicksort qs){
-	    this.qs = qs;
+	public QuicksortServer(int izq, int der){
+	    this.qs = new Quicksort(izq,der);
 	    Thread qst = new Thread(this);
 	    qst.start();
 	}
@@ -64,10 +81,12 @@ public class Quicksort implements Serializable {
 	}
     }
 
-    protected class QuicksortClient implements Runnable{
+    protected static class QuicksortClient implements Runnable{
 	Quicksort qs;
-	public QuicksortClient(int izq, int der){
-	    this.qs = new Quicksort(izq,der);
+	Socket socket;
+	ExtendedRendezvous<Quicksort> er;
+	public QuicksortClient(Quicksort qs){
+	    this.qs = qs;
 	    Thread qst = new Thread(this);
 	    qst.start();
 	}
@@ -75,8 +94,8 @@ public class Quicksort implements Serializable {
 	@Override
 	public void run(){
 	    try{
-		Socket socket = new Socket("localhost", 8080);
-		ExtendedRendezvous<Quicksort> er = new ExtendedRendezvous<Quicksort>(socket);
+		socket = new Socket("localhost", 8080);
+		er = new ExtendedRendezvous<Quicksort>(socket);
 		Quicksort aux = er.requestAndAwaitReply(this.qs);
 		if((aux.der - ((aux.i)+1) > 0)){
 		    Quicksort qsd = er.requestAndAwaitReply(new Quicksort((aux.i)+1, aux.der));	
@@ -87,16 +106,26 @@ public class Quicksort implements Serializable {
 	    } catch (Exception e){e.printStackTrace();}
 	}
     }
-    
+    /*método auxiliar para intercambiar el valor de dos variables*/
     private static void swap(int x, int y){
 	int tmp = x;
 	x = y;
 	y = tmp;
     }
+
+    /*método auxiliar para imprimir un arreglo (debugging)*/
+    private static void printArray(int [] a){
+	System.out.print("[");
+	for (int x = 0; x < a.length; x++){
+	    if (x+1 == a.length) System.out.print(a[x]);
+	    else System.out.print(a[x]+",");
+	}
+	System.out.print("]\n");
+    }
     
     public static void main(String[] args){
-	int num_elem = 10000; // número de elementos a ordenar
-	int rango = (int) Math.pow(2,18); // rango de los elementos en el arreglo
+	int num_elem = 100; // número de elementos a ordenar
+	int rango = (int) Math.pow(2,8); // rango de los elementos en el arreglo
 	System.out.println("Uso: java Quicksort -nNumeroDeElementos -rRangoDeValores");
 	for (int n = 0; n < args.length; n++){
 	    try{
@@ -111,7 +140,14 @@ public class Quicksort implements Serializable {
 		}
 	    } catch(Exception some_exception){some_exception.printStackTrace();}
 	}
-	
+	int [] us_elem = new int [num_elem]; //arreglo donde se guardaran los numeros sin ordenar
+	/*genera e imprime los números*/
+	for (int k = 0; k < us_elem.length; k++)
+	    us_elem[k] = (int)(Math.random()*rango+1);
+	printArray(us_elem);
+	QuicksortServer qss = new QuicksortServer(us_elem[0], us_elem[us_elem.length-1]);
+	QuicksortClient qsc = new QuicksortClient(new Quicksort(us_elem[0], us_elem[us_elem.length-1])); //wrapped af
+	//printArray(qsc.er.requestAndAwaitReply(qsc.qs).elem); // cuántos puntos hay ahí???
     }
 
 }    
