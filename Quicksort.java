@@ -34,6 +34,13 @@ public class Quicksort implements Serializable {
     }
 
     /**
+     * Representación en cadena del arreglo ordenado
+     */
+    @Override
+    public String toString(){
+	return printArray(this.elem);
+    }
+    /**
      * Clase que funciona como servidor para el paso de mensajes de Quicksort
      * La mayor parte del trabajo se hace aquí.
      */
@@ -53,40 +60,54 @@ public class Quicksort implements Serializable {
 	@Override
 	public void run(){
 	    try {
-		server = new ServerSocket(8080);
-		socket = server.accept();
-		er = new ExtendedRendezvous<Quicksort>(socket);
-		qs = er.getRequest();
-		int piv = qs.elem[qs.izq];
-		qs.i = qs.izq;
-		qs.d = qs.der;
-		if (qs.der - qs.izq <= 0) return;
-		boolean done = false;
-		while (!done){
-		    if (qs.elem[(qs.i)+1] > piv){
-			while(qs.d > (qs.i+1) && qs.elem[qs.d] > piv) (qs.d)--;
-			if (qs.d > (qs.i)+1){
-			    (qs.i)++;
-			    swap(qs.d,qs.i);
-			    done = (qs.i >= (qs.d)-1);
-			} else done = true;
-		    } else {
-			(qs.i)++;
-			done = qs.i >= qs.d;
+		server = new ServerSocket(3000);
+		while(true){
+		    socket = server.accept();
+		    er = new ExtendedRendezvous<Quicksort>(socket);
+		    qs = er.getRequest();
+		    if (qs != null){
+			System.out.println("se recibió solicitud");
+			System.out.println(qs.toString());
 		    }
-		    swap(qs.elem[qs.izq], qs.elem[qs.i]);
+		    else{
+			System.out.println("no se recibió solicitud");
+			break;
+		    }
+		    int piv = qs.elem[qs.izq];
+		    qs.i = qs.izq;
+		    qs.d = qs.der;
+		    if (qs.der - qs.izq <= 0) return;
+		    boolean done = false;
+		    while (!done){
+			if (qs.elem[(qs.i)+1] > piv){
+			    while(qs.d > (qs.i+1) && qs.elem[qs.d] > piv) (qs.d)--;
+			    if (qs.d > (qs.i)+1){
+				(qs.i)++;
+				swap(qs.d,qs.i);
+				done = (qs.i >= (qs.d)-1);
+			    } else done = true;
+			} else {
+			    (qs.i)++;
+			    done = qs.i >= qs.d;
+			}
+			swap(qs.elem[qs.izq], qs.elem[qs.i]);
+		    }
+		    er.response(qs);
+		    socket.close();
 		}
-		er.response(qs);
 	    } catch(Exception e) {e.printStackTrace();}
+	    finally{
+		er.close();
+	    }
 	}
     }
 
     protected static class QuicksortClient implements Runnable{
-	Quicksort qs;
+	Quicksort quick;
 	Socket socket;
 	ExtendedRendezvous<Quicksort> er;
 	public QuicksortClient(Quicksort qs){
-	    this.qs = qs;
+	    this.quick = qs;
 	    Thread qst = new Thread(this);
 	    qst.start();
 	}
@@ -94,16 +115,29 @@ public class Quicksort implements Serializable {
 	@Override
 	public void run(){
 	    try{
-		socket = new Socket("localhost", 8080);
+		socket = new Socket("localhost", 3000);
 		er = new ExtendedRendezvous<Quicksort>(socket);
-		Quicksort aux = er.requestAndAwaitReply(this.qs);
-		if((aux.der - ((aux.i)+1) > 0)){
-		    Quicksort qsd = er.requestAndAwaitReply(new Quicksort((aux.i)+1, aux.der));	
+		while(true){
+		    er.response(quick);	   
+		    Quicksort aux = er.getRequest();
+		    if(aux != null){
+			System.out.println("se envió solicitud"); 
+			System.out.println("se recibió como respuesta: "+ aux.toString());
+		    }else {
+			System.out.println("no se recibió respuesta");
+		    }
+		    if((aux.der - ((aux.i)+1) > 0)){
+			Quicksort qsd = er.requestAndAwaitReply(new Quicksort((aux.i)+1, aux.der));	
+		    }
+		    if (((aux.i)-1)-aux.izq > 0){
+			Quicksort qsi = er.requestAndAwaitReply(new Quicksort(aux.izq, (aux.i)-1));
+		    }
 		}
-		if (((aux.i)-1)-aux.izq > 0){
-		    Quicksort qsi = er.requestAndAwaitReply(new Quicksort(aux.izq, (aux.i)-1));
-		}	    
+		//socket.close();
 	    } catch (Exception e){e.printStackTrace();}
+	    finally {
+		er.close();
+	    }
 	}
     }
     /*método auxiliar para intercambiar el valor de dos variables*/
@@ -114,13 +148,13 @@ public class Quicksort implements Serializable {
     }
 
     /*método auxiliar para imprimir un arreglo (debugging)*/
-    private static void printArray(int [] a){
-	System.out.print("[");
+    private static String printArray(int [] a){
+	String stb = "[";
 	for (int x = 0; x < a.length; x++){
-	    if (x+1 == a.length) System.out.print(a[x]);
-	    else System.out.print(a[x]+",");
+	    if (x+1 == a.length) stb+=a[x];
+	    else stb+=a[x]+",";
 	}
-	System.out.print("]\n");
+	return stb+="]\n";
     }
     
     public static void main(String[] args){
@@ -144,9 +178,10 @@ public class Quicksort implements Serializable {
 	/*genera e imprime los números*/
 	for (int k = 0; k < us_elem.length; k++)
 	    us_elem[k] = (int)(Math.random()*rango+1);
-	printArray(us_elem);
-	QuicksortServer qss = new QuicksortServer(us_elem[0], us_elem[us_elem.length-1]);
+	System.out.print("Elementos sin ordenar:\n");
+	System.out.println(printArray(us_elem));
 	QuicksortClient qsc = new QuicksortClient(new Quicksort(us_elem[0], us_elem[us_elem.length-1])); //wrapped af
+	QuicksortServer qss = new QuicksortServer(us_elem[0], us_elem[us_elem.length-1]);
 	//printArray(qsc.er.requestAndAwaitReply(qsc.qs).elem); // cuántos puntos hay ahí???
     }
 
