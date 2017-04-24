@@ -8,6 +8,7 @@ import java.io.Serializable;
 import java.net.Socket;
 import java.net.ServerSocket;
 import java.util.Arrays;
+import java.io.IOException;
 
 public class Quicksort implements Serializable {
 
@@ -21,7 +22,8 @@ public class Quicksort implements Serializable {
      */
     public Quicksort(int [] us_elem){
 	this.elem = us_elem.clone();
-	izq = der = -1;
+	izq = 0;
+	der = elem.length - 1;
     }
 
     /**
@@ -48,35 +50,42 @@ public class Quicksort implements Serializable {
 	Quicksort qs;
 	ServerSocket server;
 	Socket socket;
-	ExtendedRendezvous<Quicksort> er;
+	RemoteMessagePassing<Quicksort> rmp;
 
 	public QuicksortServer(int izq, int der){
 	    this.qs = new Quicksort(izq,der);
 	    Thread qst = new Thread(this);
 	    qst.start();
 	}
-
+	
 	/*Hace todo el trabajo*/
 	@Override
 	public void run(){
 	    try {
 		server = new ServerSocket(3000);
 		while(true){
+		    /* protocolo de envio de mensajes */
 		    socket = server.accept();
-		    er = new ExtendedRendezvous<Quicksort>(socket);
-		    qs = er.getRequest();
+		    rmp = new RemoteMessagePassing<Quicksort>(socket);
+		    qs  = rmp.receive();
 		    if (qs != null){
 			System.out.println("se recibió solicitud");
-			System.out.println(qs.toString());
 		    }
 		    else{
 			System.out.println("no se recibió solicitud");
 			break;
 		    }
-		    int piv = qs.elem[qs.izq];
-		    qs.i = qs.izq;
+		    /* algoritmo */
+		    int pos = (int)(Math.random()*qs.elem.length-1);
+		    int piv = qs.elem[pos];
+		    System.out.printf("se seleccionó el elemento %d de la posición %d \n", piv, pos);
+		    qs.i = qs.izq + 1;
 		    qs.d = qs.der;
-		    if (qs.der - qs.izq <= 0) return;
+		    System.out.printf("izq = %d, der = %d \n", qs.izq, qs.der);
+		    if (qs.der - qs.izq <= 0){
+			System.out.println("no se hace nada");
+			return;
+		    }
 		    boolean done = false;
 		    while (!done){
 			if (qs.elem[(qs.i)+1] > piv){
@@ -92,22 +101,25 @@ public class Quicksort implements Serializable {
 			}
 			swap(qs.elem[qs.izq], qs.elem[qs.i]);
 		    }
-		    er.response(qs);
-		    socket.close();
+		    rmp.send(qs);	  
 		}
 	    } catch(Exception e) {e.printStackTrace();}
 	    finally{
-		er.close();
+		try{
+		socket.close();
+		rmp.close();
+		} catch(IOException ioe){ioe.printStackTrace();}
 	    }
 	}
     }
 
     protected static class QuicksortClient implements Runnable{
-	Quicksort quick;
+	Quicksort qs;
 	Socket socket;
-	ExtendedRendezvous<Quicksort> er;
+	RemoteMessagePassing<Quicksort> rmp;
+
 	public QuicksortClient(Quicksort qs){
-	    this.quick = qs;
+	    this.qs = qs;
 	    Thread qst = new Thread(this);
 	    qst.start();
 	}
@@ -116,27 +128,31 @@ public class Quicksort implements Serializable {
 	public void run(){
 	    try{
 		socket = new Socket("localhost", 3000);
-		er = new ExtendedRendezvous<Quicksort>(socket);
+		rmp = new RemoteMessagePassing<Quicksort>(socket);
 		while(true){
-		    er.response(quick);	   
-		    Quicksort aux = er.getRequest();
+		    rmp.send(qs);
+		    System.out.println("se envió solicitud"); 
+		    Quicksort aux = rmp.receive();
 		    if(aux != null){
-			System.out.println("se envió solicitud"); 
 			System.out.println("se recibió como respuesta: "+ aux.toString());
 		    }else {
 			System.out.println("no se recibió respuesta");
 		    }
 		    if((aux.der - ((aux.i)+1) > 0)){
-			Quicksort qsd = er.requestAndAwaitReply(new Quicksort((aux.i)+1, aux.der));	
+			rmp.send(new Quicksort((aux.i)+1, aux.der));
+			//Quicksort qsd = er.requestAndAwaitReply(new Quicksort((aux.i)+1, aux.der));	
 		    }
 		    if (((aux.i)-1)-aux.izq > 0){
-			Quicksort qsi = er.requestAndAwaitReply(new Quicksort(aux.izq, (aux.i)-1));
-		    }
+			rmp.send(new Quicksort(aux.izq, (aux.i)-1));
+			//Quicksort qsi = er.requestAndAwaitReply(new Quicksort(aux.izq, (aux.i)-1));
+		    }		   
 		}
 		//socket.close();
 	    } catch (Exception e){e.printStackTrace();}
 	    finally {
-		er.close();
+		try{
+		rmp.close();
+		} catch(IOException ioe){ioe.printStackTrace();}
 	    }
 	}
     }
@@ -160,7 +176,8 @@ public class Quicksort implements Serializable {
     public static void main(String[] args){
 	int num_elem = 100; // número de elementos a ordenar
 	int rango = (int) Math.pow(2,8); // rango de los elementos en el arreglo
-	System.out.println("Uso: java Quicksort -nNumeroDeElementos -rRangoDeValores");
+	if(args.length < 1 )
+	    System.out.println("Uso: java Quicksort -nNumeroDeElementos -rRangoDeValores");
 	for (int n = 0; n < args.length; n++){
 	    try{
 		if (args[n].startsWith("-n")){
@@ -180,8 +197,9 @@ public class Quicksort implements Serializable {
 	    us_elem[k] = (int)(Math.random()*rango+1);
 	System.out.print("Elementos sin ordenar:\n");
 	System.out.println(printArray(us_elem));
-	QuicksortClient qsc = new QuicksortClient(new Quicksort(us_elem[0], us_elem[us_elem.length-1])); //wrapped af
-	QuicksortServer qss = new QuicksortServer(us_elem[0], us_elem[us_elem.length-1]);
+	Quicksort start = new Quicksort(us_elem);
+	QuicksortClient qsc = new QuicksortClient(start); //wrapped af
+	QuicksortServer qss = new QuicksortServer(start.izq, start.der);
 	//printArray(qsc.er.requestAndAwaitReply(qsc.qs).elem); // cuántos puntos hay ahí???
     }
 
