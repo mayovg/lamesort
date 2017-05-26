@@ -31,7 +31,10 @@ public class ExtendedRendezvousTest {
 		//extrend.response(new Message(msjId++, "servido"));
 	    }
  	} catch (Exception ex) {ex.printStackTrace();}
-	
+	finally{
+	    socket.close();
+	    extrend.close();
+	}
     }
     
     public static void startClient() {
@@ -46,5 +49,9 @@ public class ExtendedRendezvousTest {
 		System.out.println(msj.toString());
 	    }
 	} catch(Exception ex) {ex.printStackTrace();}
+	finally{
+	    socket.close();
+	    extrend.close();
+	}
     }
 }

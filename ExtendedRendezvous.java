@@ -1,6 +1,7 @@
 import java.io.Serializable;
 import java.io.IOException;
 import java.net.Socket;
+
 public class ExtendedRendezvous<T extends Serializable> {
     
     private final RemoteMessagePassing<T> channel;

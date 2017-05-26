@@ -50,12 +50,14 @@ public class RemoteMessagePassing<T extends Serializable> {
     }
 
     public void close() throws IOException {
-	if (entrada != null)
-	    entrada.close();
-	if (salida != null)
-	    salida.close();
-	if (socket != null)
-	    socket.close();
+	try{
+	    if (entrada != null)
+		entrada.close();
+	    if (salida != null)
+		salida.close();
+	    if (socket != null)
+		socket.close();
+	} catch(IOException ioe){ioe.printStackTrace();}
     }
 }
 
